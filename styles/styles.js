@@ -7,8 +7,9 @@ export const styles = StyleSheet.create({
     backgroundColor: "#white",
   },
   phoneFrame: {
+    marginLeft: 50,
     width: 390,
-    height: 844,
+    height: 840,
 
     borderRadius: 40,
     overflow: "hidden",
@@ -52,6 +53,30 @@ export const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  uploadButton: {
+    backgroundColor: "#2D7FF9",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+
+  analyzeButton: {
+    backgroundColor: "#fcb500",
+  },
+
+  uploadButtonText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
   cardTitle: {
     color: "white",
     fontSize: 18,
@@ -64,6 +89,7 @@ export const styles = StyleSheet.create({
     height: 240,
     borderRadius: 12,
     backgroundColor: "black",
+    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -105,5 +131,66 @@ export const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "800",
   },
+
+  // 사이드바
+  headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingTop: 10,
+    },
+    hamburgerButton: {
+      padding: 5,
+    },
+    hamburgerIcon: {
+      color: "gray",
+      fontSize: 24,
+      fontWeight: "bold",
+    },
+    headerTitleText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    sidebar: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 260, // phoneFrame(390) 내부에서 차지할 너비
+      backgroundColor: "#1B1D22", // 카드와 동일한 다크 배경색
+      zIndex: 999, // 최상단으로 띄우기
+      padding: 20,
+      paddingTop: 50,
+      borderRightWidth: 1,
+      borderColor: "#2D2F35",
+    },
+    sidebarHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 30,
+    },
+    sidebarMenuTitle: {
+      color: "#fff",
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    closeButtonText: {
+      color: "#888",
+      fontSize: 20,
+      padding: 5,
+    },
+    sidebarItem: {
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: "#2D2F35",
+    },
+    sidebarItemText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "500",
+    },
 
 });
