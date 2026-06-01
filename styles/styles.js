@@ -36,7 +36,7 @@ export const styles = StyleSheet.create({
     color: "blue",
     fontSize: 32,
     fontWeight: "700",
-    marginTop: 20,
+    marginTop: 10,
   },
 
   subtitle: {
@@ -142,6 +142,7 @@ export const styles = StyleSheet.create({
     },
     hamburgerButton: {
       padding: 5,
+      marginTop: 15
     },
     hamburgerIcon: {
       color: "gray",
