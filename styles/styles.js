@@ -79,7 +79,7 @@ export const styles = StyleSheet.create({
 
   cardTitle: {
     color: "white",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     marginBottom: 14,
   },
@@ -166,6 +166,8 @@ export const styles = StyleSheet.create({
       paddingTop: 50,
       borderRightWidth: 1,
       borderColor: "#2D2F35",
+
+      flexDirection: "column",
     },
     sidebarHeader: {
       flexDirection: "row",
