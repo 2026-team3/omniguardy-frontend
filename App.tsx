@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SafeAreaView, View, Text, TouchableOpacity } from "react-native";
 import { styles } from "./styles/styles";
 
@@ -13,12 +13,66 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState<string | null>(null);
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setToken(null);
-    setCurrentScreen("CCTV");
-    setIsSidebarOpen(false);
-  };
+  useEffect(() => {
+      const checkAutoLogin = async () => {
+        try {
+          const REFRESH_API_URL = "http://10.254.2.143:8080/api/auth/refresh";
+          const response = await fetch(REFRESH_API_URL, {
+            method: "POST",
+            credentials: "include"
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            const newAccessToken = result.data.accessToken;
+            setToken(newAccessToken); // 새 엑세스 토큰 세팅
+            setIsLoggedIn(true);      // 로그인 상태 갱신
+            console.log("자동 토큰 재발급 성공! 로그인 유지 완료.");
+          }
+        } catch (error) {
+          console.log("기존 세션이 없거나 토큰 재발급에 실패했습니다.", error);
+        }
+      };
+      checkAutoLogin();
+    }, []); //  빈 배열을 주어 앱 시작 시점에 딱 한 번만 자동 실행
+
+  const handleLogout = async () => {
+    try {
+          // 💡 만약 토큰이 없다면 굳이 서버를 안 찔러도 되므로 바로 프론트 상태 초기화
+          if (!token) {
+            setIsLoggedIn(false);
+            setToken(null);
+            setCurrentScreen("CCTV");
+            setIsSidebarOpen(false);
+            return;
+          }
+          const LOGOUT_API_URL = "http://10.254.2.143:8080/api/auth/logout";
+          const response = await fetch(LOGOUT_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            console.log("백엔드 로그아웃 완료");
+          } else {
+            console.log("백엔드 로그아웃 실패 혹은 이미 만료된 토큰");
+          }
+
+        } catch (error) {
+          console.error("로그아웃 통신 에러:", error);
+        } finally {
+          // 🔑 서버 결과와 상관없이 사용자 화면은 안전하게 로그아웃 처리 및 초기화
+          setIsLoggedIn(false);
+          setToken(null);
+          setCurrentScreen("CCTV");
+          setIsSidebarOpen(false);
+          alert("로그아웃 되었습니다.");
+        }
+      };
 
   return (
     <View style={styles.phoneFrame}>
