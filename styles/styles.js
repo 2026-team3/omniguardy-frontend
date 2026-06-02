@@ -189,11 +189,14 @@ export const styles = StyleSheet.create({
       paddingVertical: 14,
       borderBottomWidth: 1,
       borderBottomColor: "#2D2F35",
+      flexDirection: "row",
+      alignItems: "center"
     },
     sidebarItemText: {
       color: "#fff",
       fontSize: 16,
       fontWeight: "500",
+      marginLeft: 10,
     },
 
 });

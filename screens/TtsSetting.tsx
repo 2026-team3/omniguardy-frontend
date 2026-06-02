@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
 import { styles } from "../styles/styles";
+import { Ionicons } from '@expo/vector-icons';
 
-export default function TtsSetting() {
-  // 1. 입력받을 문구 상태 관리
+// 💡 부모(App.tsx)로부터 전역 토큰을 받기 위한 interface 선언
+interface TtsSettingProps {
+  token: string | null;
+}
+
+export default function TtsSetting({ token }: TtsSettingProps) {
   const [message, setMessage] = useState("위험 행동이 감지되었습니다. 즉시 중단하세요.");
-  // 2. 로딩 상태 관리 (API 호출 중 버튼 비활성화 및 로딩 표시)
   const [isLoading, setIsLoading] = useState(false);
 
-  // 3. Spring Boot 백엔드 API 호출 함수
   const sendTtsRequest = async () => {
-    // 글자 수 검증 (백엔드 예외 처리 조건 반영)
     if (!message.trim()) {
       Alert.alert("알림", "송출할 문구를 입력해주세요.");
       return;
@@ -23,15 +25,15 @@ export default function TtsSetting() {
     setIsLoading(true);
 
     try {
-      // 💡 실제 Spring Boot 서버의 IP 주소와 포트를 적어주세요.
-      // (주의: 로컬 PC 테스트 시 localhost 대신 실제 IP 주소인 192.168.x.x 형식을 적어야 모바일에서 접근 가능합니다)
       const SERVER_URL = "http://10.254.2.143:8080/api/tts";
 
       const response = await fetch(SERVER_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // 🔑 명세서 필수 요구사항: Bearer 토큰 주입
         },
+        credentials: "include",
         body: JSON.stringify({
           message: message,
         }),
@@ -42,12 +44,13 @@ export default function TtsSetting() {
       if (response.ok && result.success) {
         Alert.alert("성공", "라즈베리파이로 TTS 음성 송출 요청이 전송되었습니다.");
       } else {
-        // 백엔드 에러 발생 시 처리 (MQTT_001 등)
-        Alert.alert("실패", result.message || "오류가 발생했습니다.");
+        // 백엔드에서 에러 코드(errorCode)를 같이 내려줄 경우를 대비한 가독성 패치
+        const errCode = result.errorCode ? ` (${result.errorCode})` : "";
+        Alert.alert("실패" + errCode, result.message || "오류가 발생했습니다.");
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("연동 실패 (MQTT_001)", "서버와 통신할 수 없거나 MQTT 전송에 실패했습니다.");
+      Alert.alert("연동 실패 (MQTT_001)", "서버와 통신할 수 없거나 MQTT 전송에 실패했습니다. 핫스팟 및 백엔드 상태를 확인하세요.");
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +58,6 @@ export default function TtsSetting() {
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
-      {/* 타이틀 및 소제목 */}
       <Text style={styles.title}>OmniGuardy AI</Text>
       <Text style={styles.subtitle}>1학기 시연용 Prototype</Text>
 
@@ -63,7 +65,6 @@ export default function TtsSetting() {
         음성 경고 설정
       </Text>
 
-      {/* 4. [새로 추가] 실시간 문구 입력창 카드 */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>💬 송출할 문구 입력</Text>
         <TextInput
@@ -74,12 +75,12 @@ export default function TtsSetting() {
             borderRadius: 10,
             fontSize: 15,
             minHeight: 60,
-            textAlignVertical: "top", // 안드로이드 상단 정렬
+            textAlignVertical: "top",
           }}
           placeholder="라즈베리파이 스피커로 출력할 경고 문구를 적으세요."
           placeholderTextColor="#666"
           multiline
-          maxLength={100} // 프론트엔드 단에서 100자 제한
+          maxLength={100}
           value={message}
           onChangeText={setMessage}
         />
@@ -88,13 +89,11 @@ export default function TtsSetting() {
         </Text>
       </View>
 
-      {/* 설정 카드 1 */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🚨 자동 경고 방송 활성화</Text>
         <Text style={styles.behavior}>현재 상태: 실시간 작동 중</Text>
       </View>
 
-      {/* 설정 카드 2 */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🔊 경고 오디오 선택</Text>
         <Text style={styles.score}>• 경고음 타입 A (기본 사이렌)</Text>
@@ -102,12 +101,11 @@ export default function TtsSetting() {
         <Text style={styles.score}>• 사용자 지정 녹음 파일</Text>
       </View>
 
-      {/* 5. 음성 송출 버튼 연동 */}
       <TouchableOpacity
         style={[
           styles.uploadButton,
           { alignItems: "center", paddingVertical: 14 },
-          isLoading && { backgroundColor: "#555" } // 로딩 중일 때 버튼 색상 변경
+          isLoading && { backgroundColor: "#555" }
         ]}
         onPress={sendTtsRequest}
         disabled={isLoading}
