@@ -9,52 +9,56 @@ interface TtsSettingProps {
 }
 
 export default function TtsSetting({ token }: TtsSettingProps) {
+  // 사용자가 입력하는 텍스트 상태 변수 (message)
   const [message, setMessage] = useState("위험 행동이 감지되었습니다. 즉시 중단하세요.");
   const [isLoading, setIsLoading] = useState(false);
 
   const sendTtsRequest = async () => {
-    if (!message.trim()) {
-      Alert.alert("알림", "송출할 문구를 입력해주세요.");
-      return;
-    }
-    if (message.length > 100) {
-      Alert.alert("경고 (TTS_001)", "TTS 문구는 100자 이하로 입력해주세요.");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const SERVER_URL = "http://10.254.2.143:8080/api/tts";
-
-      const response = await fetch(SERVER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // 🔑 명세서 필수 요구사항: Bearer 토큰 주입
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          message: message,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        Alert.alert("성공", "라즈베리파이로 TTS 음성 송출 요청이 전송되었습니다.");
-      } else {
-        // 백엔드에서 에러 코드(errorCode)를 같이 내려줄 경우를 대비한 가독성 패치
-        const errCode = result.errorCode ? ` (${result.errorCode})` : "";
-        Alert.alert("실패" + errCode, result.message || "오류가 발생했습니다.");
+      if (!token) {
+        alert("❌ 로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+        return;
       }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("연동 실패 (MQTT_001)", "서버와 통신할 수 없거나 MQTT 전송에 실패했습니다. 핫스팟 및 백엔드 상태를 확인하세요.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+      setIsLoading(true);
+
+      try {
+        const response = await fetch("http://10.254.2.143:8080/api/tts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          credentials: "include",
+          body: JSON.stringify({ message: message }) // 프론트가 백엔드로 보낼 때 (Request)
+        });
+
+        // 💡 403, 500 등 HTTP 에러 상태코드 우선 가드
+        if (!response.ok) {
+          if (response.status === 403) {
+            alert("❌ 접근 권한이 없습니다 (403). 로그아웃 후 다시 로그인해보세요.");
+          } else {
+            alert(`❌ 서버 에러 발생 (상태코드: ${response.status})`);
+          }
+          return;
+        }
+
+        // 💡 백엔드 응답 파싱: { "message": "택배는 문 앞에 두고 가주세요!" }
+        const result = await response.json();
+
+        // response.ok가 true라는 것 자체가 서버가 200 성공을 줬다는 뜻이므로 바로 성공 처리합니다.
+        if (response.ok && result.message) {
+          alert(`🎉 성공: 라즈베리파이로 TTS 음성 송출 완료!\n(전송된 문구: ${result.message})`);
+        } else {
+          alert("❌ 실패: 올바르지 않은 서버 응답 형식입니다.");
+        }
+
+      } catch (error) {
+        console.error("TTS 요청 에러:", error);
+        alert("❌ 연동 실패: 서버와 통신할 수 없거나 MQTT 전송에 실패했습니다. 핫스팟 및 백엔드 서버 상태를 확인하세요.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>

@@ -207,7 +207,7 @@ export default function App() {
         </View>
 
         {/* 화면 분기 조건부 렌더링 영역 */}
-        {currentScreen === "CCTV" && <CctvScreen />}
+        {currentScreen === "CCTV" && <CctvScreen token={token} />}}
         {currentScreen === "TTS" && <TtsSetting token={token} />}
         {currentScreen === "LOGIN" && (
           <LoginScreen
