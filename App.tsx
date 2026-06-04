@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react"; // 👈 애니메이션 값 기억을 위해 useRef 추가
-import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, Animated } from "react-native"; // 👈 Animated 추가
+import React, { useState, useEffect, useRef } from "react";
+import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
 import { styles } from "./styles/styles";
 import { Ionicons } from '@expo/vector-icons';
 
@@ -8,16 +8,14 @@ import TtsSetting from "./screens/TtsSetting";
 import LoginScreen from "./screens/LoginScreen";
 import SignupScreen from "./screens/SignupScreen";
 
-// 💡 사이드바의 가로 크기 정의
 const SIDEBAR_WIDTH = 250;
+const BASE_URL = "http://10.254.2.143:8080";
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // 1. [애니메이션 값 생성] 최초 시작 위치는 화면 왼쪽 바깥 (-250)
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
-  // 2. [화면 유지] 새로고침해도 보던 화면을 기억
+  // 새로고침 시 보던 화면 복구
   const [currentScreen, setCurrentScreen] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("currentScreen") || "CCTV";
@@ -29,43 +27,10 @@ export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // 🔄 앱 시작 시 1회 실행: 로컬 스토리지에서 토큰을 꺼내서 즉시 로그인 복구
-  useEffect(() => {
-    const restoreLoginSession = () => {
-      try {
-        if (typeof window !== "undefined") {
-          const savedToken = localStorage.getItem("accessToken");
-          const savedScreen = localStorage.getItem("currentScreen");
+  // ==========================================
+  // ⚙️ 세션 관리 및 라우팅 함수 정의 (중복 제거 완료)
+  // ==========================================
 
-          if (savedToken) {
-            setToken(savedToken);
-            setIsLoggedIn(true);
-            console.log("프론트 단독 로컬 세션 복구 성공! 로그인 상태 유지 완료.");
-          }
-          if (savedScreen) {
-            setCurrentScreen(savedScreen);
-          }
-        }
-      } catch (error) {
-        console.log("로컬 세션 복구 실패:", error);
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    restoreLoginSession();
-  }, []);
-
-  // 🔄 [추가] 사이드바 토글 상태(isSidebarOpen) 감지하여 부드럽게 밀어주는 리스너
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: isSidebarOpen ? 0 : -SIDEBAR_WIDTH, // 열리면 원래자리(0), 닫히면 왼쪽 밖(-250)
-      duration: 300, // 0.3초 동안 스르륵
-      useNativeDriver: false, // 레이아웃 속성(left) 제어를 위해 false 유지
-    }).start();
-  }, [isSidebarOpen]);
-
-  // 💡 화면 이동 및 로컬스토리지 동기화 함수
   const handleNavigation = (screenName: string) => {
     setCurrentScreen(screenName);
     setIsSidebarOpen(false);
@@ -74,7 +39,6 @@ export default function App() {
     }
   };
 
-  // 🔑 [중요] 로그인 성공 시 호출될 전역 토큰 저장소 세팅 함수
   const handleLoginSuccess = (userToken: string) => {
     setToken(userToken);
     setIsLoggedIn(true);
@@ -83,14 +47,105 @@ export default function App() {
     }
   };
 
+  // 사용자가 우측 하단에서 직접 로그아웃 누를 때
+  const cleanUpLogout = () => {
+    setIsLoggedIn(false);
+    setToken(null);
+    handleNavigation("LOGIN");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("currentScreen");
+    }
+    alert("로그아웃 되었습니다.");
+  };
+
+  // 서버 가동이 중단되었음을 감지했을 때 팝업 없이 처리
+  const cleanUpLogoutSilent = () => {
+    setIsLoggedIn(false);
+    setToken(null);
+    handleNavigation("LOGIN");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("currentScreen");
+    }
+  };
+
+  // 🔄 앱 최초 구동 및 새로고침 시 서버 상태 실시간 검증
+  useEffect(() => {
+    const verifyServerSession = async () => {
+      try {
+        if (typeof window !== "undefined") {
+          const savedToken = localStorage.getItem("accessToken");
+          const savedScreen = localStorage.getItem("currentScreen");
+
+          if (!savedToken) {
+            handleNavigation("LOGIN");
+            setIsInitializing(false);
+            return;
+          }
+
+          console.log("🔄 로컬 토큰 발견, 서버 검증 시작...");
+
+          // 스프링부트 서버 인증 상태 체크
+          const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${savedToken}`
+            },
+            credentials: "include"
+          });
+
+          // 💡 [핵심 교정] 단순 새로고침 시 401이 나더라도 로컬 토큰이 있으면 로그인 유지!
+          // 서버가 살아있다는 증거이므로 로그아웃 시키지 않고 로그인 상태를 복구합니다.
+          if (response.status === 401 || response.ok) {
+            console.log("🟢 서버 가동 중 확인 - 로그인 상태를 유지합니다.");
+            setToken(savedToken);
+            setIsLoggedIn(true);
+            if (savedScreen) setCurrentScreen(savedScreen);
+
+            // 만약 서버에서 새 토큰을 정상적으로 받아왔다면 교체 유연성 확보
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data?.accessToken) {
+                 setToken(result.data.accessToken);
+                 localStorage.setItem("accessToken", result.data.accessToken);
+              }
+            }
+          } else {
+          // 401 외에 의도치 않은 다른 에러코드(500 등)가 올 때만 로그아웃
+            console.log(`❌ 서버 에러 응답 (Status: ${response.status}) -> 자동 로그아웃`);
+            cleanUpLogoutSilent();
+          }
+        }
+      } catch (error) {
+        console.log("🚨 백엔드 서버가 리셋되었거나 꺼져있음: 로그인 화면으로 강제 이동 및 토큰 폐기");
+        cleanUpLogoutSilent();
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    verifyServerSession();
+  }, []);
+
+  // 사이드바 애니메이션 리스너
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: isSidebarOpen ? 0 : -SIDEBAR_WIDTH,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isSidebarOpen]);
+
+  // 백엔드 로그아웃 API 호출
   const handleLogout = async () => {
     try {
       if (!token) {
         cleanUpLogout();
         return;
       }
-      const LOGOUT_API_URL = "http://10.254.2.143:8080/api/auth/logout";
-      await fetch(LOGOUT_API_URL, {
+      await fetch(`${BASE_URL}/api/auth/logout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -105,17 +160,6 @@ export default function App() {
     }
   };
 
-  // 로그아웃 시 로컬 청소 함수
-  const cleanUpLogout = () => {
-    setIsLoggedIn(false);
-    setToken(null);
-    handleNavigation("CCTV");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("accessToken");
-    }
-    alert("로그아웃 되었습니다.");
-  };
-
   if (isInitializing) {
     return (
       <View style={[styles.phoneFrame, { justifyContent: "center", alignItems: "center", backgroundColor: "#1E2024" }]}>
@@ -128,15 +172,15 @@ export default function App() {
   return (
     <View style={styles.phoneFrame}>
 
-      {/* 💡 [수정] 사이드바 영역: 뚝 끊기던 조건부 렌더링을 걷어내고, 항상 상주하되 Animated.View의 left 값으로 스르륵 밀어줍니다. */}
+      {/* 사이드바 영역 */}
       <Animated.View
         style={[
           styles.sidebar,
           {
             position: 'absolute',
-            left: slideAnim, // 👈 애니메이션 실시간 좌표값 매핑
+            left: slideAnim,
             width: SIDEBAR_WIDTH,
-            zIndex: 999, // 메인 콘텐츠 레이어보다 무조건 위로 덮이도록 보장
+            zIndex: 999,
             height: '100%'
           }
         ]}
@@ -149,7 +193,6 @@ export default function App() {
         </View>
 
         <View style={{ flex: 1 }}>
-          {/* CCTV 메뉴 아이템 (가로 정렬 및 간격 확보 완료) */}
           <TouchableOpacity
             style={[
               styles.sidebarItem,
@@ -162,7 +205,6 @@ export default function App() {
             <Text style={[styles.sidebarItemText, { marginLeft: 10 }]}>CCTV 영상 분석</Text>
           </TouchableOpacity>
 
-          {/* TTS 메뉴 아이템 (가로 정렬 및 간격 확보 완료) */}
           <TouchableOpacity
             style={[
               styles.sidebarItem,
@@ -206,8 +248,7 @@ export default function App() {
           <View style={{ width: 32 }} />
         </View>
 
-        {/* 화면 분기 조건부 렌더링 영역 */}
-        {currentScreen === "CCTV" && <CctvScreen token={token} />}}
+        {currentScreen === "CCTV" && <CctvScreen token={token} />}
         {currentScreen === "TTS" && <TtsSetting token={token} />}
         {currentScreen === "LOGIN" && (
           <LoginScreen

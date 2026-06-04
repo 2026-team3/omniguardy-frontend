@@ -70,7 +70,10 @@ export default function TtsSetting({ token }: TtsSettingProps) {
       </Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>💬 송출할 문구 입력</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>송출할 문구 입력</Text>
+        </View>
         <TextInput
           style={{
             backgroundColor: "#2D2F35",
@@ -94,16 +97,21 @@ export default function TtsSetting({ token }: TtsSettingProps) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🚨 자동 경고 방송 활성화</Text>
+        <Ionicons name="alert-circle-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+        <Text style={[styles.cardTitle, { marginBottom: 0 }]}>자동 경고 방송 활성화</Text>
         <Text style={styles.behavior}>현재 상태: 실시간 작동 중</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔊 경고 오디오 선택</Text>
+      {/*<View style={styles.card}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          <Ionicons name="volume-medium-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>경고 오디오 선택</Text>
+        </View>
         <Text style={styles.score}>• 경고음 타입 A (기본 사이렌)</Text>
         <Text style={styles.score}>• 경고음 타입 B (TTS 안내 음성)</Text>
         <Text style={styles.score}>• 사용자 지정 녹음 파일</Text>
       </View>
+      */}
 
       <TouchableOpacity
         style={[
@@ -117,7 +125,10 @@ export default function TtsSetting({ token }: TtsSettingProps) {
         {isLoading ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text style={styles.uploadButtonText}>📢 테스트 음성 송출</Text>
+            <View style={{flexDirection: "row", alignItems: "center", marginBottom: 10}}>
+                <Ionicons name="megaphone-outline" size={18} color="white" style={{ marginRight: 6 }} />
+                <Text style={styles.uploadButtonText}>테스트 음성 송출</Text>
+            </View>
         )}
       </TouchableOpacity>
     </ScrollView>
