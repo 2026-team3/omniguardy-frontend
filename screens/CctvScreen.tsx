@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 import * as DocumentPicker from "expo-document-picker";
 import { styles } from "../styles/styles";
+import { Ionicons } from '@expo/vector-icons';
 
 interface CctvScreenProps {
   token: string;
@@ -20,6 +21,9 @@ export default function CctvScreen({ token }: CctvScreenProps) {
   const [videoUri, setVideoUri] = useState("");
   const [videoName, setVideoName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [videoHeight, setVideoHeight] = useState(200);
+  const screenWidth = Dimensions.get("window").width;
 
   // 💡 파이썬 JSON에 등록된 정확한 실제 파일명 목록 (가운데 공백까지 완벽 반영)
   const validNames = [
@@ -42,6 +46,22 @@ export default function CctvScreen({ token }: CctvScreenProps) {
       setVideoUri(result.assets[0].uri);
       setVideoName(result.assets[0].name || "");
       setUploaded(true);
+    }
+  };
+
+  // 💡 [버그 교정] 어떤 환경이든 undefined 에러 없이 안전하게 비율을 뽑아내는 함수
+  const handleVideoReady = (event: any) => {
+    // expo-av 버전에 따라 naturalSize가 바로 안 나오거나 다른 곳에 들어있을 수 있음
+    const size = event?.naturalSize || event?.videoToDisplay || event?.target;
+
+    if (size && size.width && size.height) {
+      const aspectRatio = size.height / size.width;
+      // 가로 너비(100% = 358px 기준)에 맞게 높이를 동적으로 계산
+      // 컨테이너 크롭 없이 전체 화면이 깔끔하게 다 나오도록 높이 세팅
+      setVideoHeight(screenWidth * aspectRatio * 0.9);
+    } else {
+      // 만약 사이즈를 못 가져오는 경우 기본 16:9 비율 유지
+      setVideoHeight(screenWidth * aspectRatio * 0.9);
     }
   };
 
@@ -146,21 +166,39 @@ export default function CctvScreen({ token }: CctvScreenProps) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.videoPlaceholder}>
+        <View style={[
+          styles.videoPlaceholder,
+            {
+              height: videoUri ? videoHeight : 240, // 영상이 있을 때만 동적 높이 적용!
+              overflow: "hidden",
+              backgroundColor: "#000",
+              borderRadius: 12
+            }
+        ]}>
           {videoUri ? (
             <Video
               source={{ uri: videoUri }}
               useNativeControls
               shouldPlay={false}
               isLooping
-              resizeMode={ResizeMode.CONTAIN}
+              resizeMode={ResizeMode.CONTAIN} // 비율 유지하며 채우기
+              onReadyForDisplay={handleVideoReady} // 👈 수정된 리스너 바인딩
               style={{ width: "100%", height: "100%" }}
             />
-          ) : (
-            <Text style={styles.placeholderText}>CCTV 영상 영역</Text>
+            ) : (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                <Ionicons name="images-outline" size={32} color="#4E515B" style={{ marginBottom: 8 }} />
+                <Text style={styles.placeholderText}>CCTV 영상을 선택해 주세요.</Text>
+              </View>
           )}
         </View>
-        {uploaded && <Text style={{ padding: 10, color: '#666', fontSize: 12 }}>선택된 원본 파일: {videoName}</Text>}
+
+        {uploaded && (
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 10 }}>
+            <Ionicons name="document-attach-outline" size={14} color="#666" style={{ marginRight: 4 }} />
+            <Text style={{ color: '#666', fontSize: 12 }} numberOfLines={1}>선택된 원본: {videoName}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -171,7 +209,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>위험도 분석</Text>
         <Text style={styles.score}>Vision Score : {visionScore}</Text>
-        <Text style={styles.score}>Audio Score : {audioScore}</Text>
+        {/*<Text style={styles.score}>Audio Score : {audioScore}</Text>*/}
       </View>
 
       <View style={[
