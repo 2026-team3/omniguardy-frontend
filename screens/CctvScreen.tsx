@@ -10,7 +10,7 @@ interface CctvScreenProps {
 }
 
 export default function CctvScreen({ token }: CctvScreenProps) {
-  const BASE_URL = "http://10.254.2.143:8080";
+  const BASE_URL = "http://10.215.74.143:8080";
 
   const [visionScore, setVisionScore] = useState(0);
   const [audioScore, setAudioScore] = useState(0);
@@ -19,6 +19,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
 
   const [uploaded, setUploaded] = useState(false);
   const [videoUri, setVideoUri] = useState("");
+  const [displayVideoUri, setDisplayVideoUri] = useState("");
   const [videoName, setVideoName] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -44,6 +45,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
     const result = await DocumentPicker.getDocumentAsync({ type: "video/*" });
     if (!result.canceled) {
       setVideoUri(result.assets[0].uri);
+      setDisplayVideoUri(result.assets[0].uri);
       setVideoName(result.assets[0].name || "");
       setUploaded(true);
     }
@@ -129,6 +131,10 @@ export default function CctvScreen({ token }: CctvScreenProps) {
         setBehavior(displayBehavior);
         setVisionScore(aiData.riskScore || 0);
         setRiskLevel(aiData.riskLevel || "NORMAL");
+        if (aiData.annotatedVideo) {
+          console.log("분석 영상 URL:", aiData.annotatedVideo);
+          setDisplayVideoUri(aiData.annotatedVideo);
+        }
 
         Alert.alert("분석 완료", result.message || "성공적으로 AI 분석 데이터를 가져왔습니다.");
       } else {
@@ -177,7 +183,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
         ]}>
           {videoUri ? (
             <Video
-              source={{ uri: videoUri }}
+              source={{ uri: displayVideoUri || videoUri }}
               useNativeControls
               shouldPlay={false}
               isLooping
