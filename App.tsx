@@ -1,5 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import React, { useState, useEffect, useRef } from "react";
-import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
+import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, Animated, Platform } from "react-native";
 import { styles } from "./styles/styles";
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,42 +11,53 @@ import LoginScreen from "./screens/LoginScreen";
 import SignupScreen from "./screens/SignupScreen";
 
 const SIDEBAR_WIDTH = 250;
-const BASE_URL = "http://10.254.2.143:8080";
+const BASE_URL = "http://10.215.74.143:8080";
+const saveItem = async (key: string, value: string) => {
+  if (Platform.OS === "web") {
+    localStorage.setItem(key, value);
+  } else {
+    await AsyncStorage.setItem(key, value);
+  }
+};
+
+const getItem = async (key: string) => {
+  if (Platform.OS === "web") {
+    return localStorage.getItem(key);
+  } else {
+    return await AsyncStorage.getItem(key);
+  }
+};
+
+const removeItem = async (key: string) => {
+  if (Platform.OS === "web") {
+    localStorage.removeItem(key);
+  } else {
+    await AsyncStorage.removeItem(key);
+  }
+};
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
 
-  // 새로고침 시 보던 화면 복구
-  const [currentScreen, setCurrentScreen] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("currentScreen") || "CCTV";
-    }
-    return "CCTV";
-  });
+  const [currentScreen, setCurrentScreen] = useState("LOGIN");
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // ==========================================
-  // ⚙️ 세션 관리 및 라우팅 함수 정의 (중복 제거 완료)
-  // ==========================================
-
-  const handleNavigation = (screenName: string) => {
+  const handleNavigation = async (screenName: string) => {
     setCurrentScreen(screenName);
     setIsSidebarOpen(false);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("currentScreen", screenName);
-    }
+
+    await saveItem("currentScreen", screenName);
   };
 
-  const handleLoginSuccess = (userToken: string) => {
+  const handleLoginSuccess = async (userToken: string) => {
     setToken(userToken);
     setIsLoggedIn(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("accessToken", userToken);
-    }
+
+    await saveItem("accessToken", userToken);
   };
 
   // 사용자가 우측 하단에서 직접 로그아웃 누를 때
@@ -52,37 +65,38 @@ export default function App() {
     setIsLoggedIn(false);
     setToken(null);
     handleNavigation("LOGIN");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("currentScreen");
-    }
+
+    removeItem("accessToken");
+    removeItem("currentScreen");
     alert("로그아웃 되었습니다.");
   };
 
-  // 서버 가동이 중단되었음을 감지했을 때 팝업 없이 처리
+
   const cleanUpLogoutSilent = () => {
     setIsLoggedIn(false);
     setToken(null);
     handleNavigation("LOGIN");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("currentScreen");
-    }
+
+    removeItem("accessToken");
+    removeItem("currentScreen");
   };
 
   // 🔄 앱 최초 구동 및 새로고침 시 서버 상태 실시간 검증
   useEffect(() => {
     const verifyServerSession = async () => {
       try {
-        if (typeof window !== "undefined") {
-          const savedToken = localStorage.getItem("accessToken");
-          const savedScreen = localStorage.getItem("currentScreen");
+        const savedToken = await getItem("accessToken");
+        const savedScreen = await getItem("currentScreen");
 
-          if (!savedToken) {
-            handleNavigation("LOGIN");
-            setIsInitializing(false);
-            return;
-          }
+        if (!savedToken) {
+          handleNavigation("LOGIN");
+          setIsInitializing(false);
+          return;
+        }
+
+        if (savedScreen) {
+          setCurrentScreen(savedScreen);
+        }
 
           console.log("🔄 로컬 토큰 발견, 서버 검증 시작...");
 
@@ -109,7 +123,7 @@ export default function App() {
               const result = await response.json();
               if (result.success && result.data?.accessToken) {
                  setToken(result.data.accessToken);
-                 localStorage.setItem("accessToken", result.data.accessToken);
+                 await saveItem("accessToken", result.data.accessToken);
               }
             }
           } else {
@@ -117,7 +131,7 @@ export default function App() {
             console.log(`❌ 서버 에러 응답 (Status: ${response.status}) -> 자동 로그아웃`);
             cleanUpLogoutSilent();
           }
-        }
+
       } catch (error) {
         console.log("🚨 백엔드 서버가 리셋되었거나 꺼져있음: 로그인 화면으로 강제 이동 및 토큰 폐기");
         cleanUpLogoutSilent();
@@ -218,7 +232,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <View style={{ alignItems: "flex-end", marginTop: "auto", paddingBottom: 10 }}>
+        <View style={{ alignItems: "flex-end", marginTop: "auto", paddingBottom: 20 }}>
           {isLoggedIn ? (
             <TouchableOpacity onPress={handleLogout} style={{ padding: 5, flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="log-out-outline" size={16} color="#aaa" style={{ marginRight: 4 }} />

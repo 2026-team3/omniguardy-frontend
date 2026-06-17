@@ -7,14 +7,14 @@ export const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   phoneFrame: {
-    marginLeft: 50,
+
     width: 390,
     height: 840,
 
     borderRadius: 40,
     overflow: "hidden",
 
-    borderWidth: 5,
+    borderWidth: 0,
     borderColor: "#111",
     shadowColor: "#000",
     shadowOffset: {
@@ -86,7 +86,7 @@ export const styles = StyleSheet.create({
 
   videoPlaceholder: {
     width: "100%",
-    height: 240,
+    aspectRatio: 9 / 16,
     borderRadius: 12,
     backgroundColor: "black",
     overflow: "hidden",

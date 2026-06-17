@@ -14,6 +14,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
 
   const [visionScore, setVisionScore] = useState(0);
   const [audioScore, setAudioScore] = useState(0);
+  const [audioStatus, setAudioStatus] = useState("");
   const [behavior, setBehavior] = useState("영상을 업로드하고 분석을 시작하세요.");
   const [riskLevel, setRiskLevel] = useState("NORMAL");
 
@@ -23,7 +24,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
   const [videoName, setVideoName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [videoHeight, setVideoHeight] = useState(200);
+  const [videoHeight, setVideoHeight] = useState(220);
   const screenWidth = Dimensions.get("window").width;
 
   // 💡 파이썬 JSON에 등록된 정확한 실제 파일명 목록 (가운데 공백까지 완벽 반영)
@@ -51,25 +52,16 @@ export default function CctvScreen({ token }: CctvScreenProps) {
     }
   };
 
-  // 💡 [버그 교정] 어떤 환경이든 undefined 에러 없이 안전하게 비율을 뽑아내는 함수
   const handleVideoReady = (event: any) => {
-    // expo-av 버전에 따라 naturalSize가 바로 안 나오거나 다른 곳에 들어있을 수 있음
-    const size = event?.naturalSize || event?.videoToDisplay || event?.target;
-
-    if (size && size.width && size.height) {
-      const aspectRatio = size.height / size.width;
-      // 가로 너비(100% = 358px 기준)에 맞게 높이를 동적으로 계산
-      // 컨테이너 크롭 없이 전체 화면이 깔끔하게 다 나오도록 높이 세팅
-      setVideoHeight(screenWidth * aspectRatio * 0.9);
-    } else {
-      // 만약 사이즈를 못 가져오는 경우 기본 16:9 비율 유지
-      setVideoHeight(screenWidth * aspectRatio * 0.9);
-    }
-  };
+      console.log("Video event:", event);
+    };
 
   const analyzeVideo = async () => {
     if (!token) {
-      Alert.alert("인증 오류", "로그인 토큰이 유효하지 않습니다. 다시 로그인해 주세요.");
+      Alert.alert(
+        "인증 오류",
+        "로그인 토큰이 유효하지 않습니다. 다시 로그인해 주세요."
+      );
       return;
     }
 
@@ -81,68 +73,127 @@ export default function CctvScreen({ token }: CctvScreenProps) {
     setLoading(true);
 
     try {
-      const fileResponse = await fetch(videoUri);
-      const rawBlob = await fileResponse.blob();
+      // 업로드한 파일명 정리
+      const baseName = videoName
+        .replace(/\.[^/.]+$/, "")
+        .replace(/\s+/g, "");
 
-      // 1. 현재 사용자가 선택한 원본 파일명에서 확장자를 떼고 공백을 제거하여 정제합니다.
-      // 예: "사용자뒤접근.mp4" -> "사용자뒤접근"
-      const baseName = videoName.replace(/\.[^/.]+$/, "").replace(/\s+/g, "");
-
-      // 2. 파이썬 JSON 유효 목록 중에서 사용자가 올린 파일명과 가장 유사한 뼈대 이름을 찾습니다.
-      // 글자 공백을 무시하고 포함 여부를 판단하므로 "사용자뒤접근"을 올리면 "사용자뒤 접근"을 완벽하게 찾아냅니다.
+      // 파이썬 JSON과 이름 맞추기
       let matchedName = baseName;
       for (const validName of validNames) {
-        const cleanValidName = validName.replace(/\s+/g, ""); // 비교용 공백 제거
-        if (baseName.includes(cleanValidName) || cleanValidName.includes(baseName)) {
-          matchedName = validName; // 파이썬이 원하는 진짜 이름 선택
+        const cleanValidName = validName.replace(/\s+/g, "");
+        if (
+          baseName.includes(cleanValidName) ||
+          cleanValidName.includes(baseName)
+        ) {
+          matchedName = validName;
           break;
         }
       }
 
       const targetFileName = `${matchedName}.mp4`;
-      console.log("🔍 [이름 유연 매칭 결과] 최종 전송 파일명:", targetFileName);
+      console.log(
+        "🔍 [이름 유연 매칭 결과] 최종 전송 파일명:",
+        targetFileName
+      );
 
-      const fileBlob = new File([rawBlob], targetFileName, { type: "video/mp4" });
-
+      // React Native에서는 File() 생성하지 말고 uri를 직접 넘긴다
       const formData = new FormData();
-      formData.append("file", fileBlob);
 
-      const response = await fetch(`${BASE_URL}/api/ai/vision`, {
+      formData.append(
+        "file",
+        {
+          uri: videoUri,
+          name: targetFileName,
+          type: "video/mp4",
+        } as any
+      );
+
+      const response = await fetch(`${BASE_URL}/api/ai/analyze`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
       const result = await response.json();
-      console.log("백엔드가 보내준 실시간 원본 JSON 데이터:", result);
+      console.log("백엔드 응답:", result);
 
       if (response.ok && result.success === true) {
-        const aiData = result.data;
 
+        const visionData = result.data?.vision;
+        const audioData = result.data?.audio;
+
+        // ------------------
+        // Vision 결과
+        // ------------------
         let displayBehavior = "감지된 행동 없음";
-        if (aiData.events) {
-          displayBehavior = Array.isArray(aiData.events)
-            ? aiData.events.join(", ")
-            : String(aiData.events);
+
+        if (visionData?.events) {
+          displayBehavior = Array.isArray(visionData.events)
+            ? visionData.events.join(", ")
+            : String(visionData.events);
         }
 
         setBehavior(displayBehavior);
-        setVisionScore(aiData.riskScore || 0);
-        setRiskLevel(aiData.riskLevel || "NORMAL");
-        if (aiData.annotatedVideo) {
-          console.log("분석 영상 URL:", aiData.annotatedVideo);
-          setDisplayVideoUri(aiData.annotatedVideo);
+
+        setVisionScore(
+          visionData?.riskScore ?? 0
+        );
+
+        setRiskLevel(
+          visionData?.riskLevel ?? "NORMAL"
+        );
+
+        // ------------------
+        // Audio 결과
+        // ------------------
+        setAudioScore(
+          Math.round(
+            (audioData?.probability ?? 0)
+          )
+        );
+
+        setAudioStatus(
+          audioData?.status ?? "normal"
+        );
+
+        // ------------------
+        // 분석 영상
+        // ------------------
+        if (visionData?.annotatedVideo) {
+
+          const encodedUrl = encodeURI(
+            visionData.annotatedVideo
+          );
+
+          console.log(
+            "분석 영상 URL:",
+            encodedUrl
+          );
+
+          setDisplayVideoUri(
+            encodedUrl
+          );
         }
 
-        Alert.alert("분석 완료", result.message || "성공적으로 AI 분석 데이터를 가져왔습니다.");
+        Alert.alert(
+          "분석 완료",
+          result.message || "AI 분석이 완료되었습니다."
+        );
       } else {
-        Alert.alert("분석 실패", result.message || "서버 응답 오류가 발생했습니다.");
+        Alert.alert(
+          "분석 실패",
+          result.message || "서버 응답 오류가 발생했습니다."
+        );
       }
     } catch (error) {
       console.error("스프링부트 통신 실패:", error);
-      Alert.alert("에러", "Spring Boot 서버 상태 또는 네트워크 연결을 확인해 주세요.");
+      Alert.alert(
+        "에러",
+        "Spring Boot 서버 상태 또는 네트워크 연결을 확인해 주세요."
+      );
     } finally {
       setLoading(false);
     }
@@ -157,39 +208,52 @@ export default function CctvScreen({ token }: CctvScreenProps) {
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>CCTV 영상</Text>
 
-          <TouchableOpacity
-            style={[styles.uploadButton, uploaded && styles.analyzeButton]}
-            onPress={uploaded ? analyzeVideo : pickVideo}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
+          <View style={{ flexDirection: "row" }}>
+            <TouchableOpacity
+              style={styles.uploadButton}
+              onPress={pickVideo}
+              disabled={loading}
+            >
               <Text style={styles.uploadButtonText}>
-                {uploaded ? "영상 분석 시작" : "영상 업로드"}
+                {uploaded ? "영상 변경" : "영상 업로드"}
               </Text>
+            </TouchableOpacity>
+
+            {uploaded && (
+              <TouchableOpacity
+                style={[
+                  styles.analyzeButton,
+                  { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }
+                ]}
+                onPress={analyzeVideo}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.uploadButtonText}>분석 시작</Text>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={[
-          styles.videoPlaceholder,
-            {
-              height: videoUri ? videoHeight : 240, // 영상이 있을 때만 동적 높이 적용!
-              overflow: "hidden",
-              backgroundColor: "#000",
-              borderRadius: 12
-            }
-        ]}>
+        <View
+          style={{
+            width: "100%",
+            aspectRatio: 16 / 9,   // 또는 9/16 (영상에 맞게)
+            backgroundColor: "#000",
+            borderRadius: 12,
+            overflow: "hidden",
+          }}
+        >
           {videoUri ? (
             <Video
               source={{ uri: displayVideoUri || videoUri }}
               useNativeControls
               shouldPlay={false}
-              isLooping
               resizeMode={ResizeMode.CONTAIN} // 비율 유지하며 채우기
-              onReadyForDisplay={handleVideoReady} // 👈 수정된 리스너 바인딩
-              style={{ width: "100%", height: "100%" }}
+              style={{ width: "100%", height: "100%", objectFit: "contain" as any, }}
             />
             ) : (
               <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -215,7 +279,7 @@ export default function CctvScreen({ token }: CctvScreenProps) {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>위험도 분석</Text>
         <Text style={styles.score}>Vision Score : {visionScore}</Text>
-        {/*<Text style={styles.score}>Audio Score : {audioScore}</Text>*/}
+        <Text style={styles.score}>Audio Status : {audioStatus}</Text>
       </View>
 
       <View style={[
